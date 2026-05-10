@@ -1,23 +1,34 @@
 package main.Utils;
 
-public class SecurityUtils {
-    // Эмуляция PreparedStatement
+public final class SecurityUtils {
+    private SecurityUtils() {
+        throw new UnsupportedOperationException("Утилитный класс");
+    }
+
     public static String safeSqlInjection(String query, String parameter){
-        // Здесь был бы вызов PreparedStatement.setString()
-        return query + "параметр экранирован: '" + parameter.replace("'","''")+ "')";
+        if (query == null) throw new IllegalArgumentException("Query не может быть null");
+        if (parameter == null) parameter = "";
+
+        String escaped = parameter.replace("'", "''");
+
+        return query.replace("?", "'" + escaped + "'") +
+                "\n[Параметр экранирован: спецсимволы не интерпретируются как SQL]";
     }
 
     public static String escapeHtml(String input){
-        if (input == null) return null;
-        StringBuilder sb = new StringBuilder();
+        if (input == null) return "";
+        if (input.isEmpty()) return "";
+
+        StringBuilder sb = new StringBuilder(input.length());
         for (char c : input.toCharArray()){
             switch (c){
-                case '<': sb.append("&lt;"); break;
-                case '>': sb.append("&gt;"); break;
-                case '&': sb.append("&amp;"); break;
-                case '"': sb.append("&quot;"); break;
-                case '\'': sb.append("&#x27;"); break;
-                default: sb.append(c);
+                case '<'  -> sb.append("&lt;");
+                case '>'  -> sb.append("&gt;");
+                case '&'  -> sb.append("&amp;");
+                case '"'  -> sb.append("&quot;");
+                case '\'' -> sb.append("&#x27;");
+                case '/'  -> sb.append("&#x2F;");
+                default   -> sb.append(c);
             }
         }
         return sb.toString();

@@ -5,6 +5,7 @@ import java.awt.*;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.util.List;
+import java.util.function.Supplier;
 
 public class Window extends JFrame{
     private final List<Vulnerability> modules;
@@ -21,15 +22,21 @@ public class Window extends JFrame{
         addWindowListener(new WindowAdapter() {
             @Override                                                               //ЗАКРЫТИЕ ОКНА
             public void windowClosing(WindowEvent e) {
-                int res = JOptionPane.showConfirmDialog(null, "Выйти из программы?");
+                int res = JOptionPane.showConfirmDialog(Window.this,
+                        "Выйти из программы?",
+                        "Подтверждение выхода",
+                        JOptionPane.YES_NO_OPTION);
                 if (res == JOptionPane.YES_OPTION)
                     System.exit(0);
             }
         });
-        double h = Toolkit.getDefaultToolkit().getScreenSize().getHeight();
-        double w = Toolkit.getDefaultToolkit().getScreenSize().getWidth();
-        setPreferredSize(new Dimension((int) w / 2,(int) h / 2));
-        setLocation(450, 200);
+
+        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+        int w = screenSize.width / 2;
+        int h = screenSize.height / 2;
+        setPreferredSize(new Dimension(w, h));
+        setMinimumSize(new Dimension(700,400));
+        setLocation((screenSize.width - w)/2, (screenSize.height - h)/2);
 
 
         initComponents();
@@ -49,6 +56,8 @@ public class Window extends JFrame{
 
         outputArea = new JTextArea();
         outputArea.setEditable(false);
+        outputArea.setLineWrap(true);
+        outputArea.setWrapStyleWord(true);
         outputArea.setFont(new Font("Segoe UI",Font.PLAIN,16));
         JScrollPane textScroll = new JScrollPane(outputArea);
                                                                         // ДОБАВЛЕНИЕ КНОПКИ В ОКНЕ
@@ -75,55 +84,49 @@ public class Window extends JFrame{
         add(buttonPanel, BorderLayout.SOUTH);
     }
 
-    private void showDescription(){                             //КНОПКА ВЫВОДА ОПИСАНИЯ
+    private Vulnerability getSelectedModule(String errorMessage) {
         int index = moduleList.getSelectedIndex();
-        if (index == -1){
-            outputArea.setText("Выберите модуль из списка.");
-            return;
+        if (index == -1) {
+            outputArea.setText(errorMessage);
+            return null;
         }
-        Vulnerability module = modules.get(index);
+        return modules.get(index);
+    }
+
+    private void showDescription(){                             //КНОПКА ВЫВОДА ОПИСАНИЯ
+        Vulnerability module = getSelectedModule("Выберите модуль из списка.");
+        if (module == null) return;
         outputArea.setText(module.getDescription());
-        outputArea.append(captureOutput(module::getVulnerableExample));
     }
 
     private void showVulnerable(){                  //КНОПКА ВЫВОДА УЯЗВИМОСТИ
-        int index = moduleList.getSelectedIndex();
-        if (index == -1){
-            outputArea.setText("Выберите модуль из списка.");
-            return;
-        }
-        Vulnerability module = modules.get(index);
+        Vulnerability module = getSelectedModule("Выберите модуль из списка.");
+        if (module == null) return;
         outputArea.setText(module.getVulnerableExample());
-        outputArea.append(captureOutput(module::getVulnerableExample));
     }
 
     private void showFixed(){                                   //КНОПКА ВЫВОДА ПРИМЕРА ИСПРАВЛЕНИЯ
-        int index = moduleList.getSelectedIndex();
-        if (index == -1){
-            outputArea.setText("Выберите модуль из списка.");
-            return;
-        }
-        Vulnerability module = modules.get(index);
-        outputArea.setText(module.getFixedExample()+ "\n\n");
-        outputArea.append(captureOutput(module::getFixedExample));
+        Vulnerability module = getSelectedModule("Выберите модуль из списка.");
+        if (module == null) return;
+        outputArea.setText(module.getFixedExample());
     }
 
-    private String captureOutput(Runnable action){                      //ФУНКЦИЯ ПЕРЕХВАТА ВВОДА В КОНСОЛЬ
+    private String captureOutput(Supplier<String> action){                      //ФУНКЦИЯ ПЕРЕХВАТА ВВОДА В КОНСОЛЬ
         java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
         java.io.PrintStream old = System.out;
         System.setOut(new java.io.PrintStream(baos));
-        action.run();
-        System.setOut(old);
+        try{
+            System.setOut(new java.io.PrintStream(baos));
+            action.get();
+        } finally {
+            System.setOut(old);
+        }
         return baos.toString();
     }
 
     private void simulateThreat(){                                          //ФУНКЦИЯ СИМУЛЯЦИИ УЯЗВИМОСТИ
-        int index = moduleList.getSelectedIndex();
-        if (index == -1){
-            outputArea.setText("Выберите модуль.");
-            return;
-        }
-        Vulnerability module = modules.get(index);
+        Vulnerability module = getSelectedModule("Выберите модуль из списка.");
+        if (module == null) return;
         module.simulate();
     }
 }
