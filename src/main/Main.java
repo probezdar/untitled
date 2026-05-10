@@ -30,6 +30,6 @@ public static void main(String[] args) {
         } catch (Exception e) {
             System.err.println("Ошибка инициализации UI:" + e.getMessage());
         }
-        new Window(modules);
+        new StartWindow(modules);
     });
 }
