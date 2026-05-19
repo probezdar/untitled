@@ -1,5 +1,7 @@
 package main.modules;
 
+import main.Utils.CodePlayground;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
@@ -73,28 +75,29 @@ public class StartWindow extends JFrame {
         buttonGrid.setBorder(new EmptyBorder(30, 60, 20, 60));
 
         MenuButton btnLearn = new MenuButton(
-                "📚  Начать обучение",
+                "  Начать обучение",
                 "Изучите уязвимости и способы защиты",
                 new Color(64, 160, 110)
         );
-        MenuButton btnTest = new MenuButton(
-                "📝  Тестирование",
-                "Проверьте свои знания",
-                new Color(86, 130, 200)
+        MenuButton btnSandbox = new MenuButton(
+                "  Песочница",
+                "Пишите и запускайте Java-код",
+                new Color(140, 100, 200)
+
         );
         MenuButton btnCert = new MenuButton(
-                "🏆  Получить сертификат",
+                "  Получить сертификат",
                 "Завершите обучение и тест",
                 new Color(180, 130, 60)
         );
         MenuButton btnAbout = new MenuButton(
-                "ℹ️  О программе",
+                "  О программе",
                 "Информация о CyberPractice",
                 new Color(100, 100, 140)
         );
 
         buttonGrid.add(btnLearn);
-        buttonGrid.add(btnTest);
+        buttonGrid.add(btnSandbox);
         buttonGrid.add(btnCert);
         buttonGrid.add(btnAbout);
 
@@ -115,7 +118,10 @@ public class StartWindow extends JFrame {
 
         // ── ДЕЙСТВИЯ КНОПОК ────────────────────────────────────
         btnLearn.addActionListener(e -> openLearning());
-        btnTest.addActionListener(e -> openTest());
+        btnSandbox.addActionListener(e -> {
+            setVisible(false);
+            new CodePlayground(this);
+        });
         btnCert.addActionListener(e -> openCertificate());
         btnAbout.addActionListener(e -> openAbout());
     }

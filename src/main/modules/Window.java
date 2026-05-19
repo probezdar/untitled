@@ -67,7 +67,7 @@ public class Window extends JFrame{
         moduleList.setFixedCellHeight(45);
         moduleList.setBorder(new EmptyBorder(5, 5, 5, 5));
 
-        JLabel listHint = new JLabel("👆 Двойной клик — описание модуля");
+        JLabel listHint = new JLabel(" Двойной клик — описание модуля");
         listHint.setFont(new Font("Segoe UI", Font.ITALIC, 11));
         listHint.setForeground(new Color(166, 173, 200));
         listHint.setBorder(new EmptyBorder(4, 8, 4, 4));
@@ -109,7 +109,7 @@ public class Window extends JFrame{
                     outputArea.setText(
                             "Выбран модуль: " + module.getTitle() + "\n\n" +
                                     "Используйте кнопки ниже для изучения материала.\n" +
-                                    "💡 Совет: начните с описания, затем изучите примеры кода.\n\n" +
+                                    " Совет: начните с описания, затем изучите примеры кода.\n\n" +
                                     "• [Описание]           — что такое эта уязвимость\n" +
                                     "• [Уязвимый код]       — как выглядит небезопасный код\n" +
                                     "• [Исправленный код]   — как правильно защититься\n" +
@@ -129,9 +129,9 @@ public class Window extends JFrame{
         outputArea.setCaretColor(Color.WHITE);
         outputArea.setBorder(new EmptyBorder(12, 14, 12, 14));
         outputArea.setText(
-                "👋 Добро пожаловать в модуль обучения!\n\n" +
+                "Добро пожаловать в модуль обучения!\n\n" +
                         "Выберите тему из списка слева, чтобы начать.\n\n" +
-                        "💡 Подсказка: дважды кликните по теме для просмотра описания."
+                        "  Подсказка: дважды кликните по теме для просмотра описания."
         );
 
         JScrollPane textScroll = new JScrollPane(outputArea);
@@ -142,10 +142,10 @@ public class Window extends JFrame{
         buttonPanel.setBackground(new Color(30, 30, 46));
         buttonPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
 
-        JButton btnDesc     = createActionButton("📖 Описание",         new Color(86, 130, 200));
-        JButton btnVul      = createActionButton("⚠️ Уязвимый код",     new Color(200, 80, 80));
-        JButton btnFixed    = createActionButton("✅ Исправленный код",  new Color(64, 160, 110));
-        JButton btnSimulate = createActionButton("🔴 Симулировать",      new Color(180, 100, 40));
+        JButton btnDesc     = createActionButton("Описание",         new Color(86, 130, 200));
+        JButton btnVul      = createActionButton("Уязвимый код",     new Color(200, 80, 80));
+        JButton btnFixed    = createActionButton("Исправленный код",  new Color(64, 160, 110));
+        JButton btnSimulate = createActionButton("Симулировать",      new Color(180, 100, 40));
 
         buttonPanel.add(btnDesc);
         buttonPanel.add(btnVul);
