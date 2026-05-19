@@ -2,17 +2,26 @@ package main.Utils;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.event.DocumentEvent;
+import javax.swing.text.BadLocationException;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.awt.event.WindowEvent;
-import java.util.concurrent.ExecutionException;
+import java.awt.event.*;
+import java.util.concurrent.*;
+
 
 public class CodePlayground extends JFrame {
     private final JFrame parentWindow;
     private JTextArea codeArea;
     private JTextArea outputArea;
     private JLabel statusLabel;
+    private JButton btnRun;
+    private JButton btnStop;
+
+    private SwingWorker<String, String> currentWorker = null;
+    private Future<?> currentTask = null;
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+
+    private static final int TIMEOUT_SECONDS = 5;
 
     private static final String TEMPLATE_SQL = """
             public class Example {
@@ -76,6 +85,8 @@ public class CodePlayground extends JFrame {
                         JOptionPane.YES_NO_OPTION
                 );
                 if (res == JOptionPane.YES_NO_OPTION){
+                    stopExecution();
+                    executor.shutdown();
                     dispose();
                     parentWindow.setVisible(true);
                 }
@@ -134,15 +145,77 @@ public class CodePlayground extends JFrame {
         codeArea.setCaretColor(Color.WHITE);
         codeArea.setTabSize(4);
         codeArea.setBorder(new EmptyBorder(10,12,10,12));
+        codeArea.setSelectionColor(new Color(86,130,200,150));
+
+        codeArea.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_TAB){
+                    e.consume();
+                    int caretPos = codeArea.getCaretPosition();
+                    try{
+                        codeArea.getDocument().insertString(caretPos, "    ", null);
+                    } catch (BadLocationException ex) {
+                        ex.printStackTrace();
+                    }
+                }
+
+                if (e.getKeyCode() == KeyEvent.VK_ENTER &&
+                e.isControlDown()){
+                    e.consume();
+                    runCode();
+                }
+            }
+        });
+
+        JTextArea lineNumbers = new JTextArea("1");
+        lineNumbers.setBackground(new Color(28, 28, 42));
+        lineNumbers.setForeground(new Color(100, 110, 140));
+        lineNumbers.setFont(new Font("JetBrains Mono", Font.PLAIN, 14));
+        lineNumbers.setEditable(false);
+        lineNumbers.setBorder(new EmptyBorder(10, 6, 10, 6));
+
+        codeArea.getDocument().addDocumentListener(new javax.swing.event.DocumentListener(){
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                updateLines();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                updateLines();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                updateLines();
+            }
+
+            private void updateLines(){
+                SwingUtilities.invokeLater(() -> {
+                    int lines = codeArea.getLineCount();
+                    StringBuilder sb = new StringBuilder();
+                    for (int i = 1; i <= lines; i++){
+                        sb.append(i);
+                        if (i < lines) sb.append("\n");
+                    }
+                    lineNumbers.setText(sb.toString());
+                });
+            }
+        });
 
         JScrollPane codeScroll = new JScrollPane(codeArea);
-        codeScroll.setBorder(BorderFactory.createLineBorder(new Color(86,130,200),1));
-        JLabel codeLabel = new JLabel("Редактор кода");
-        codeLabel.setFont(new Font("Segou UI", Font.BOLD,13));
-        codeLabel.setForeground(new Color(137,180,250));
-        codeLabel.setBackground(new Color(40,40,56));
+        codeScroll.setRowHeaderView(lineNumbers);
+        codeScroll.setBorder(
+                BorderFactory.createLineBorder(new Color(86,130,200),1)
+        );
+
+        JLabel codeLabel = new JLabel("  Редактор кода  [Ctrl+Enter — запустить]");
+        codeLabel.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        codeLabel.setForeground(new Color(137, 180, 250));
+        codeLabel.setBackground(new Color(40, 40, 56));
         codeLabel.setOpaque(true);
-        codeLabel.setBorder(new EmptyBorder(6,8,6,8));
+        codeLabel.setBorder(new EmptyBorder(6, 8, 6, 8));
         codeScroll.setColumnHeaderView(codeLabel);
 
         //ОБЛАСТЬ ВЫВОДА
@@ -177,16 +250,21 @@ public class CodePlayground extends JFrame {
         splitPane.setBackground(new Color(30,30,46));
 
         //КНОПКИ УПРАВЛЕНИЯ
-        JButton btnRun = createActionButton("▶  Запустить", new Color(64,160,110));
-        JButton btnClear = createActionButton("🗑  Очистить", new Color(100,100,140));
+        btnRun = createActionButton("\u25BA Запустить", new Color(64,160,110));
+        btnStop = createActionButton("■ Остановить", new Color(200,80,80));
+        JButton btnClear = createActionButton(" Очистить вывод", new Color(100,100,140));
+
+        btnStop.setEnabled(false);
+        btnStop.setOpaque(true);
 
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT,10,8));
         buttonPanel.setBackground(new Color(30,30,46));
         buttonPanel.add(btnClear);
         buttonPanel.add(btnRun);
+        buttonPanel.add(btnStop);
 
         //СТАТУС БАР
-        statusLabel = new JLabel("  Готов к запуску. Нажмите ▶ Запустить.");
+        statusLabel = new JLabel("  Готов к запуску. Нажмите \u25BA Запустить.");
         statusLabel.setFont(new Font("Segoe UI", Font.ITALIC, 12));
         statusLabel.setForeground(new Color(166, 173, 200));
         statusLabel.setBackground(new Color(24, 24, 36));
@@ -215,51 +293,118 @@ public class CodePlayground extends JFrame {
 
         //ДЕЙСТВИЯ
         btnRun.addActionListener(e -> runCode());
+        btnStop.addActionListener(e -> stopExecution());
         btnClear.addActionListener(e -> {
             outputArea.setText("");
             setStatus("Вывод очищен.");
         });
     }
 
-    private void runCode(){
+    private void runCode() {
         String code = codeArea.getText().trim();
-        if (code.isEmpty()){
+        if (code.isEmpty()) {
             setStatus("Напишите код перед запуском.");
             return;
         }
 
-        setStatus("Компиляция и выполнение...");
+        // Сбрасываем вывод перед каждым запуском
         outputArea.setText("");
+        outputArea.setForeground(new Color(166, 227, 161));
 
-        SwingWorker<String,Void> worker = new SwingWorker<String, Void>() {
+        setRunningState(true);
+        setStatus("Компиляция...");
+
+        currentWorker = new SwingWorker<>() {
+
             @Override
-            protected String doInBackground() {
-                return CodeExecutor.compileAndRun("Example", code);
+            protected String doInBackground() throws Exception {
+                setStatus("Выполнение...");
+
+                currentTask = executor.submit(() ->
+                        CodeExecutor.compileAndRun("Example", code)
+                );
+
+                try {
+
+                    return (String) ((Future<?>) currentTask).get(
+                            TIMEOUT_SECONDS, TimeUnit.SECONDS
+                    );
+                } catch (TimeoutException e) {
+                    currentTask.cancel(true); // прерываем поток
+                    return "TIMEOUT: Выполнение прервано — превышено время ожидания ("
+                            + TIMEOUT_SECONDS + " сек).\n\n"
+                            + "Возможные причины:\n"
+                            + "  • Бесконечный цикл (while(true), for(;;))\n"
+                            + "  • Очень долгие вычисления\n\n"
+                            + "Совет: проверьте условие выхода из цикла.";
+                } catch (CancellationException e) {
+                    return "Выполнение остановлено пользователем.";
+                } catch (ExecutionException e) {
+                    return "Ошибка выполнения: " + e.getCause().getMessage();
+                }
             }
 
             @Override
             protected void done() {
+                if (isCancelled()) {
+                    outputArea.setForeground(new Color(243, 139, 168));
+                    outputArea.setText("Выполнение остановлено пользователем.");
+                    setStatus("Остановлено.");
+                    setRunningState(false);
+                    return;
+                }
+
                 try {
                     String result = get();
                     outputArea.setText(result);
                     outputArea.setCaretPosition(0);
 
-                    if (result.startsWith("Ошибка")) {
-                        outputArea.setForeground(new Color(243, 139, 168));
+                    if (result.startsWith("TIMEOUT")) {
+                        outputArea.setForeground(new Color(250, 179, 135)); // оранжевый
+                        setStatus("Превышено время выполнения (" + TIMEOUT_SECONDS + " сек).");
+                    } else if (result.startsWith("Ошибка")
+                            || result.startsWith("ошибка")
+                            || result.contains("Ошибка компиляции")) {
+                        outputArea.setForeground(new Color(243, 139, 168)); // красный
                         setStatus("Ошибка выполнения.");
-                    }
-                    else {
-                        outputArea.setForeground(new Color(166,227,161));
+                    } else {
+                        outputArea.setForeground(new Color(166, 227, 161)); // зелёный
                         setStatus("Выполнено успешно.");
                     }
-
                 } catch (Exception e) {
-                    outputArea.setText("Ошибка: " + e.getMessage());
+                    outputArea.setText("Внутренняя ошибка: " + e.getMessage());
                     setStatus("Внутренняя ошибка.");
+                } finally {
+                    setRunningState(false);
                 }
             }
         };
-        worker.execute();
+
+        currentWorker.execute();
+    }
+
+    private void stopExecution() {
+        if (currentTask != null && !currentTask.isDone()){
+            currentTask.cancel(true);
+        }
+        if (currentTask != null && !currentTask.isDone()){
+            currentTask.cancel(true);
+        }
+        outputArea.setForeground(new Color(243,139,168));
+        outputArea.setText("Выполнение остановлено пользователем.");
+        setStatus("Остановлено.");
+        setRunningState(false);
+    }
+
+    private void setRunningState(boolean running) {
+        btnRun.setEnabled(!running);
+        btnStop.setEnabled(running);
+        codeArea.setEditable(!running);
+        if (running) {
+            codeArea.setBackground(new Color(30,30,44));
+        } else{
+            codeArea.setBackground(new Color(36,36,52));
+        }
     }
 
     private void setStatus(String text){
@@ -276,7 +421,7 @@ public class CodePlayground extends JFrame {
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         btn.addActionListener(e ->{
             codeArea.setText(template);
-            setStatus("Шаблон загружен. Нажмите ▶ Запустить.");
+            setStatus("Шаблон загружен. Нажмите \u25BA Запустить.");
         });
         btn.addMouseListener(new MouseAdapter() {
             @Override
