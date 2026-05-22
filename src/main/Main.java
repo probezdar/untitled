@@ -1,9 +1,6 @@
 
 import main.modules.*;
-import main.modules.VulnerabilityPack.DirectoryTraversal;
-import main.modules.VulnerabilityPack.PrivilegeEscalation;
-import main.modules.VulnerabilityPack.SQLInjection;
-import main.modules.VulnerabilityPack.XssModule;
+import main.modules.VulnerabilityPack.*;
 import main.modules.Window;
 
 import javax.swing.*;
@@ -16,7 +13,8 @@ public static void main(String[] args) {
                 new SQLInjection(),
                 new XssModule(),
                 new DirectoryTraversal(),
-                new PrivilegeEscalation()
+                new PrivilegeEscalation(),
+                new HardcodedCredentials()
         );
 
         try{
