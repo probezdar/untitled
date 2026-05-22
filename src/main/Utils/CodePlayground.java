@@ -4,12 +4,15 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.text.BadLocationException;
+import javax.swing.undo.UndoManager;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.concurrent.*;
 
 
 public class CodePlayground extends JFrame {
+    private final UndoManager undoManager = new UndoManager();
+    private CodeAutoComplete autoComplete;
     private final JFrame parentWindow;
     private JTextArea codeArea;
     private JTextArea outputArea;
@@ -84,7 +87,7 @@ public class CodePlayground extends JFrame {
                         "Выход из песочницы",
                         JOptionPane.YES_NO_OPTION
                 );
-                if (res == JOptionPane.YES_NO_OPTION){
+                if (res == JOptionPane.YES_OPTION){
                     stopExecution();
                     executor.shutdown();
                     dispose();
@@ -116,8 +119,16 @@ public class CodePlayground extends JFrame {
         titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
         titleLabel.setForeground(new Color(137,180,250));
 
+        JLabel hintLabel = new JLabel(
+                "Ctrl+Enter — запустить | Tab — автодополнение | Время выполнения: "
+                        + TIMEOUT_SECONDS + " сек."
+        );
+
+        hintLabel.setFont(new Font("Segoe UI", Font.ITALIC, 12));
+        hintLabel.setForeground(new Color(166,173,200));
+
         headerPanel.add(titleLabel, BorderLayout.NORTH);
-        headerPanel.add(titleLabel, BorderLayout.SOUTH);
+        headerPanel.add(hintLabel, BorderLayout.SOUTH);
 
         // ШАБЛОНЫ
         JPanel templatePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 6));
@@ -139,6 +150,9 @@ public class CodePlayground extends JFrame {
 
         // РЕДАКТОР КОДА
         codeArea = new JTextArea(TEMPLATE_EMPTY);
+        codeArea.getDocument().addUndoableEditListener(undoManager);
+        autoComplete = new CodeAutoComplete(codeArea);
+
         codeArea.setFont(new Font("JetBrains Mono", Font.PLAIN,14));
         codeArea.setBackground(new Color(36,36,52));
         codeArea.setForeground(new Color(220,220,235));
@@ -149,7 +163,113 @@ public class CodePlayground extends JFrame {
 
         codeArea.addKeyListener(new KeyAdapter() {
             @Override
+            public void keyTyped(KeyEvent e) {
+                char c = e.getKeyChar();
+                int pos = codeArea.getCaretPosition();
+                String text = codeArea.getText();
+
+                switch (c) {
+                    case '(' -> insertPair(text, pos, e, '(', ')');
+                    case '{' -> insertPair(text,pos, e, '{', '}');
+                    case '[' -> insertPair(text,pos,e,'[',']');
+                    case '"' -> insertPair(text,pos, e, '"', '"');
+                    case '\'' -> insertPair(text,pos, e, '\'', '\'');
+                }
+            }
+
+            @Override
             public void keyPressed(KeyEvent e) {
+                int code = e.getKeyCode();
+                int pos =  codeArea.getCaretPosition();
+                String text = codeArea.getText();
+
+                if (code == KeyEvent.VK_Z && e.isControlDown() &&  !e.isShiftDown()) {
+                    e.consume();
+                    if (undoManager.canUndo()){
+                        undoManager.undo();
+                    }
+                    return;
+                }
+
+                if (code == KeyEvent.VK_Z && e.isControlDown() &&  e.isShiftDown()) {
+                    e.consume();
+                    if (undoManager.canRedo()){
+                        undoManager.redo();
+                    }
+                    return;
+                }
+
+                if (code == KeyEvent.VK_TAB && e.isShiftDown()){
+                    e.consume();
+                    removeIndent(codeArea,pos);
+                    return;
+                }
+
+                if (code == KeyEvent.VK_TAB){
+                    e.consume();
+                    if (autoComplete != null && autoComplete.isPopupVisible()){
+                        autoComplete.applyCurrentSelection();
+                        return;
+                    }
+                    insertText(codeArea,pos, "    ");
+                    return;
+                }
+
+                if (e.getKeyCode() == KeyEvent.VK_ENTER && e.isControlDown()){
+                    e.consume();
+                    runCode();
+                }
+
+                if (code == KeyEvent.VK_ENTER || code == KeyEvent.VK_CLOSE_BRACKET){
+                    if (pos < text.length()){
+                        char next = text.charAt(pos);
+                        char expected = switch(codeArea.getCaret().getMagicCaretPosition() != null ? text.charAt(pos) : ' ') {
+                            case ')' -> ')';
+                            case '}' -> '}';
+                            case ']' -> ']';
+                            case '"' -> '"';
+                            case '\'' -> '\'';
+                            default -> ' ';
+                        };
+                        if (next == expected && (code == KeyEvent.VK_RIGHT)){
+                            e.consume();
+                            codeArea.setCaretPosition(pos + 1);
+                        }
+                    }
+                }
+
+                if (code == KeyEvent.VK_ENTER) {
+                    e.consume();
+                    if (autoComplete != null && autoComplete.isPopupVisible()){
+                        autoComplete.applyCurrentSelection();
+                        return;
+                    }
+                    smartEnter(codeArea,text,pos);
+                    return;
+                }
+
+                if (code == KeyEvent.VK_BACK_SPACE) {
+                    e.consume();
+
+                    if (codeArea.getSelectedText() != null) {
+                        codeArea.replaceSelection("");
+                        return;
+                    }
+                    smartBackspace(codeArea, text, pos);
+                    return;
+                }
+
+                if (code == KeyEvent.VK_DELETE){
+                    e.consume();
+                    if (codeArea.getSelectedText() != null) {
+                        codeArea.replaceSelection("");
+                        return;
+                    }
+                    smartDelete(codeArea, text, pos);
+                    return;
+                }
+
+
                 if (e.getKeyCode() == KeyEvent.VK_TAB){
                     e.consume();
                     int caretPos = codeArea.getCaretPosition();
@@ -158,12 +278,6 @@ public class CodePlayground extends JFrame {
                     } catch (BadLocationException ex) {
                         ex.printStackTrace();
                     }
-                }
-
-                if (e.getKeyCode() == KeyEvent.VK_ENTER &&
-                e.isControlDown()){
-                    e.consume();
-                    runCode();
                 }
             }
         });
@@ -296,6 +410,8 @@ public class CodePlayground extends JFrame {
         btnStop.addActionListener(e -> stopExecution());
         btnClear.addActionListener(e -> {
             outputArea.setText("");
+            outputArea.setForeground(new Color(166, 227, 161));
+            undoManager.discardAllEdits();
             setStatus("Вывод очищен.");
         });
     }
@@ -384,8 +500,8 @@ public class CodePlayground extends JFrame {
     }
 
     private void stopExecution() {
-        if (currentTask != null && !currentTask.isDone()){
-            currentTask.cancel(true);
+        if (currentWorker != null && !currentWorker.isDone()){
+            currentWorker.cancel(true);
         }
         if (currentTask != null && !currentTask.isDone()){
             currentTask.cancel(true);
@@ -458,5 +574,162 @@ public class CodePlayground extends JFrame {
             }
         });
         return btn;
+    }
+
+    //ВСТАВКА ПАРЫ СКОБОК
+    private void insertPair(String text, int pos, KeyEvent e, char open, char close){
+        e.consume();
+        if ((open == '"' || open == '\'') && pos < text.length()  && text.charAt(pos) == open){
+            codeArea.setCaretPosition(pos + 1);
+            return;
+        }
+
+        String insert = String.valueOf(open) + close;
+        try {
+            codeArea.getDocument().insertString(pos,insert,null);
+            codeArea.setCaretPosition(pos+1);
+        } catch (Exception ignored) {}
+    }
+
+
+    //УМНЫЙ ENTER
+    private void smartEnter (JTextArea area, String text, int pos) {
+        try {
+            int lineStart = text.lastIndexOf('\n', pos - 1) + 1;
+            String currentLine = text.substring(lineStart, pos);
+
+            StringBuilder indent = new StringBuilder();
+            for (char c : currentLine.toCharArray()) {
+                if (c == ' ') indent.append(' ');
+                else if (c == '\t') indent.append("    ");
+                else break;
+            }
+
+            char lastNonSpace = getLastNonSpace(text, pos);
+            char nextNonSpace = getNextNonSpace(text, pos);
+
+            String extra = "";
+            boolean addExtraEnd = false;
+
+            if (lastNonSpace == '{' || lastNonSpace == ':' || lastNonSpace == '(') {
+                extra = "    ";
+                addExtraEnd = true;
+            }
+            StringBuilder insert = new StringBuilder("\n");
+            insert.append(indent);
+
+            if (addExtraEnd) {
+                insert.append(extra);
+                // Если после курсора стоит }, добавляем \n+отступ перед ней
+                if (nextNonSpace == '}') {
+                    String closingLine = "\n" + indent;
+                    String insertStr = insert.toString() + "\n" + indent;
+                    area.getDocument().insertString(pos, insertStr, null);
+                    area.setCaretPosition(pos + insert.length());
+                    return;
+                }
+            }
+
+            area.getDocument().insertString(pos, insert.toString(), null);
+            area.setCaretPosition(pos + insert.length());
+        } catch (Exception ignored) {}
+    }
+
+    private void smartBackspace(JTextArea area, String text, int pos) {
+        if (pos == 0) return;
+
+        try {
+            // Проверяем символы перед курсором
+            int spacesBefore = 0;
+            int checkPos = pos - 1;
+
+            while (checkPos >= 0 && text.charAt(checkPos) == ' ') {
+                spacesBefore++;
+                checkPos--;
+            }
+
+            // Если перед курсором ровно кратное число пробелов (4, 8, 12...)
+            // и мы стоим на границе отступа — удаляем весь отступ
+            if (spacesBefore > 0 && spacesBefore % 4 == 0
+                    && (checkPos < 0 || text.charAt(checkPos) == '\n')) {
+                // Удаляем весь блок отступа
+                area.getDocument().remove(pos - spacesBefore, spacesBefore);
+                return;
+            }
+
+            // Проверяем удаление парных скобок
+            char before = text.charAt(pos - 1);
+            char after = pos < text.length() ? text.charAt(pos) : '\0';
+
+            if (isPair(before, after)) {
+                // Удаляем обе скобки сразу
+                area.getDocument().remove(pos - 1, 2);
+                return;
+            }
+
+            // Обычное удаление одного символа
+            area.getDocument().remove(pos - 1, 1);
+
+        } catch (Exception ignored) {}
+    }
+
+    private void smartDelete(JTextArea area, String text, int pos) {
+        if (pos >= text.length()) return;
+
+        try {
+            char before = pos > 0 ? text.charAt(pos - 1) : '\0';
+            char after = text.charAt(pos);
+
+            if (isPair(before, after)) {
+                area.getDocument().remove(pos - 1, 2);
+                area.setCaretPosition(pos - 1);
+                return;
+            }
+
+            area.getDocument().remove(pos, 1);
+
+        } catch (Exception ignored) {}
+    }
+
+    private void removeIndent(JTextArea area, int pos) {
+        try {
+            int lineStart = area.getText().lastIndexOf('\n', pos - 1) + 1;
+            int spaces = 0;
+            while (lineStart + spaces < pos
+                    && area.getText().charAt(lineStart + spaces) == ' ') {
+                spaces++;
+            }
+            int toRemove = Math.min(4, spaces);
+            if (toRemove > 0) {
+                area.getDocument().remove(lineStart, toRemove);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private void insertText(JTextArea area, int pos, String text) {
+        try {
+            area.getDocument().insertString(pos, text, null);
+            area.setCaretPosition(pos + text.length());
+        } catch (Exception ignored) {}
+    }
+
+    private boolean isPair(char a, char b) {
+        return (a == '(' && b == ')')
+                || (a == '{' && b == '}')
+                || (a == '[' && b == ']')
+                || (a == '"' && b == '"')
+                || (a == '\'' && b == '\'');
+    }
+
+    private char getLastNonSpace(String text, int pos) {
+        int i = pos - 1;
+        while (i >= 0 && text.charAt(i) == ' ') i--;
+        return i >= 0 ? text.charAt(i) : '\0';
+    }
+
+    private char getNextNonSpace(String text, int pos) {
+        int i = pos;
+        while (i < text.length() && text.charAt(i) == ' ') i++;
+        return i < text.length() ? text.charAt(i) : '\0';
     }
 }
