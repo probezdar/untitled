@@ -26,42 +26,6 @@ public class CodePlayground extends JFrame {
 
     private static final int TIMEOUT_SECONDS = 5;
 
-    private static final String TEMPLATE_SQL = """
-            public class Example {
-                public static void main(String[] args) {
-                    //Симуляция SQL-инъекции
-                    String userInput = "admin' OR '1'='1' --";
-                    String query = "SELECT * FROM users WHERE username = '" + userInput + "'";
-                    \s
-                    System.out.println("=== SQL Injection ===");
-                    System.out.println("Запрос: " + query);
-                    System.out.println("Результат: все пользователи получены!");
-                }
-            }
-            """;
-
-    private static final String TEMPLATE_XSS = """
-            public class Example {
-                public static void main(String[] args) {
-                    // Симуляция XSS
-                    String userComment = "<script>alert('XSS')</script>";
-                   \s
-                    // Уязвимый вывод
-                    String vulnerable = "<div>" + userComment + "</div>";
-                   \s
-                    // Безопасный вывод (экранирование)
-                    String safe = userComment
-                        .replace("&", "&amp;")
-                        .replace("<", "&lt;")
-                        .replace(">", "&gt;");
-                   \s
-                    System.out.println("=== XSS Демонстрация ===");
-                    System.out.println("Уязвимо: " + vulnerable);
-                    System.out.println("Безопасно: <div>" + safe + "</div>");
-                }
-            }
-            """;
-
     private static final String TEMPLATE_EMPTY = """
             public class Example {
                 public static void main(String[] args) {
@@ -70,6 +34,474 @@ public class CodePlayground extends JFrame {
                 }
             }
             """;
+
+    private static final String TEMPLATE_SQL_VULNERABLE = """
+        public class Example {
+            public static void main(String[] args) {
+                // Симуляция уязвимого SQL запроса
+                String username = "admin' OR '1'='1' --";
+                String password = "anything";
+               \s
+                // УЯЗВИМО: прямая конкатенация строк
+                String query = "SELECT * FROM users "
+                             + "WHERE username = '" + username + "' "
+                             + "AND password = '" + password + "'";
+               \s
+                System.out.println("=== SQL Injection — Уязвимый код ===");
+                System.out.println("Введённые данные:");
+                System.out.println("  Логин:  " + username);
+                System.out.println("  Пароль: " + password);
+                System.out.println();
+                System.out.println("Сформированный запрос:");
+                System.out.println("  " + query);
+                System.out.println();
+               \s
+                // Анализ — что произошло с запросом
+                if (query.contains("--")) {
+                    System.out.println("РЕЗУЛЬТАТ: Проверка пароля закомментирована!");
+                    System.out.println("  Всё после -- игнорируется базой данных.");
+                    System.out.println("  Вход выполнен без знания пароля!");
+                }
+                if (query.toLowerCase().contains("or '1'='1'")) {
+                    System.out.println("РЕЗУЛЬТАТ: Условие всегда истинно!");
+                    System.out.println("  OR '1'='1' возвращает ВСЕ строки таблицы.");
+                }
+            }
+        }
+        """;
+
+    private static final String TEMPLATE_SQL_SAFE = """
+        public class Example {
+            public static void main(String[] args) {
+                // Симуляция безопасного SQL запроса (PreparedStatement)
+                String username = "admin' OR '1'='1' --";
+                String password = "anything";
+               \s
+                // БЕЗОПАСНО: используем шаблон с параметрами
+                String queryTemplate = "SELECT * FROM users "
+                                     + "WHERE username = ? "
+                                     + "AND password = ?";
+               \s
+                // Экранируем параметры (эмуляция PreparedStatement)
+                String safeUsername = username.replace("'", "''");
+                String safePassword = password.replace("'", "''");
+               \s
+                System.out.println("=== SQL Injection — Безопасный код ===");
+                System.out.println("Введённые данные:");
+                System.out.println("  Логин:  " + username);
+                System.out.println("  Пароль: " + password);
+                System.out.println();
+                System.out.println("Шаблон запроса (компилируется заранее):");
+                System.out.println("  " + queryTemplate);
+                System.out.println();
+                System.out.println("Параметры после экранирования:");
+                System.out.println("  Параметр 1: '" + safeUsername + "'");
+                System.out.println("  Параметр 2: '" + safePassword + "'");
+                System.out.println();
+                System.out.println("Итог: SQL символы воспринимаются как текст.");
+                System.out.println("Инъекция невозможна — структура запроса");
+                System.out.println("зафиксирована до подстановки данных!");
+            }
+        }
+        """;
+
+    private static final String TEMPLATE_XSS_VULNERABLE = """
+        public class Example {
+            public static void main(String[] args) {
+                // Симуляция XSS — вывод без экранирования
+                String userComment = "<script>alert('XSS атака!')</script>";
+               \s
+                // УЯЗВИМО: вставляем ввод напрямую в HTML
+                String html = "<div>Комментарий: " + userComment + "</div>";
+               \s
+                System.out.println("=== XSS — Уязвимый код ===");
+                System.out.println("Ввод пользователя:");
+                System.out.println("  " + userComment);
+                System.out.println();
+                System.out.println("Сгенерированный HTML:");
+                System.out.println("  " + html);
+                System.out.println();
+                System.out.println("Что видит браузер:");
+                System.out.println("  Тег <script> — это код!");
+                System.out.println("  Браузер ВЫПОЛНИТ скрипт!");
+                System.out.println();
+               \s
+                // Демонстрация других XSS векторов
+                String[] payloads = {
+                    "<script>document.cookie</script>",
+                    "<img src=x onerror=alert('XSS')>",
+                    "<svg onload=alert('XSS')>",
+                    "javascript:alert('XSS')"
+                };
+               \s
+                System.out.println("Другие варианты XSS payload:");
+                for (String payload : payloads) {
+                    System.out.println("  " + payload);
+                }
+            }
+        }
+        """;
+
+    private static final String TEMPLATE_XSS_SAFE = """
+        public class Example {
+            public static void main(String[] args) {
+                String userComment = "<script>alert('XSS атака!')</script>";
+               \s
+                // БЕЗОПАСНО: экранируем спецсимволы HTML
+                String escaped = escapeHtml(userComment);
+                String html = "<div>Комментарий: " + escaped + "</div>";
+               \s
+                System.out.println("=== XSS — Безопасный код ===");
+                System.out.println("Ввод пользователя:");
+                System.out.println("  " + userComment);
+                System.out.println();
+                System.out.println("После escapeHtml():");
+                System.out.println("  " + escaped);
+                System.out.println();
+                System.out.println("Сгенерированный HTML:");
+                System.out.println("  " + html);
+                System.out.println();
+                System.out.println("Что видит браузер:");
+                System.out.println("  Теги < > заменены на &lt; &gt;");
+                System.out.println("  Браузер показывает их как ТЕКСТ");
+                System.out.println("  Скрипт НЕ выполняется!");
+            }
+           \s
+            // Метод экранирования HTML символов
+            static String escapeHtml(String input) {
+                if (input == null) return "";
+                return input
+                    .replace("&",  "&amp;")
+                    .replace("<",  "&lt;")
+                    .replace(">",  "&gt;")
+                    .replace("\\"", "&quot;")
+                    .replace("'",  "&#x27;");
+            }
+        }
+        """;
+
+    private static final String TEMPLATE_TRAVERSAL = """
+        public class Example {
+            public static void main(String[] args) {
+                String baseDir  = "/var/www/app/files/";
+               \s
+                // Варианты ввода: обычный и вредоносный
+                String[] inputs = {
+                    "report.pdf",             // обычный запрос
+                    "../secret.txt",          // выход на уровень выше
+                    "../../etc/passwd",       // системный файл
+                    "....//....//etc/passwd"  // обход простых фильтров
+                };
+               \s
+                System.out.println("=== Directory Traversal — Демонстрация ===");
+                System.out.println("Разрешённая папка: " + baseDir);
+                System.out.println();
+               \s
+                for (String input : inputs) {
+                    System.out.println("Ввод: " + input);
+               \s
+                    // УЯЗВИМЫЙ путь — простая конкатенация
+                    String vulnerable = baseDir + input;
+                    System.out.println("  Уязвимый путь:   " + vulnerable);
+               \s
+                    // Нормализованный путь (как видит ОС)
+                    java.io.File file = new java.io.File(vulnerable);
+                    String normalized = file.getAbsolutePath()
+                        .replace("\\\\", "/");
+                    System.out.println("  После normalize: " + normalized);
+               \s
+                    // Проверка безопасности
+                    boolean isSafe = normalized.startsWith(baseDir);
+                    System.out.println("  Безопасно? " + (isSafe ? "ДА" : "НЕТ — АТАКА!"));
+                    System.out.println();
+                }
+               \s
+                // Демонстрация правильной проверки
+                System.out.println("=== Правильная проверка (getCanonicalPath) ===");
+                String userInput = "../../etc/passwd";
+                try {
+                    java.io.File base      = new java.io.File(baseDir);
+                    java.io.File requested = new java.io.File(base, userInput);
+                    String canonicalBase   = base.getCanonicalPath();
+                    String canonicalReq    = requested.getCanonicalPath();
+               \s
+                    System.out.println("Канонический BASE:    " + canonicalBase);
+                    System.out.println("Канонический запрос:  " + canonicalReq);
+                    System.out.println("Доступ разрешён? " +
+                        canonicalReq.startsWith(canonicalBase));
+                } catch (Exception e) {
+                    System.out.println("Результат: " + e.getMessage());
+                }
+            }
+        }
+        """;
+
+
+    private static final String TEMPLATE_PRIVILEGE = """
+        public class Example {
+            public static void main(String[] args) throws Exception {
+                System.out.println("=== Privilege Escalation — Демонстрация ===");
+                System.out.println();
+               \s
+                // Симуляция проверки прав пользователя
+                String currentUser = "www-data";
+                String sudoConfig  = "www-data ALL=(ALL) NOPASSWD: ALL";
+               \s
+                System.out.println("Текущий пользователь: " + currentUser);
+                System.out.println("Конфигурация sudo:");
+                System.out.println("  " + sudoConfig);
+                System.out.println();
+               \s
+                // Анализ конфигурации
+                boolean isVulnerable = sudoConfig.contains("NOPASSWD: ALL");
+                System.out.println("Анализ конфигурации:");
+               \s
+                if (isVulnerable) {
+                    System.out.println("  КРИТИЧНО: NOPASSWD: ALL обнаружен!");
+                    System.out.println("  Пользователь может выполнить ЛЮБУЮ команду");
+                    System.out.println("  без ввода пароля!");
+                    System.out.println();
+                    System.out.println("Симуляция атаки:");
+                    System.out.println("  $ sudo su -");
+                    System.out.println("  # whoami");
+                    System.out.println("  root  <- получены права администратора!");
+                }
+               \s
+                System.out.println();
+                System.out.println("=== Безопасная конфигурация ===");
+                String safeConfig = "www-data ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart nginx";
+                System.out.println("  " + safeConfig);
+                System.out.println("  Разрешена только одна конкретная команда.");
+               \s
+                // Симуляция проверки PATH
+                System.out.println();
+                System.out.println("=== PATH Hijacking — Проверка ===");
+                String path = System.getenv("PATH");
+                System.out.println("Текущий PATH: " + path);
+               \s
+                String[] pathDirs = path != null ? path.split(
+                    System.getProperty("os.name")
+                        .toLowerCase().contains("win") ? ";" : ":"
+                ) : new String[]{};
+               \s
+                for (String dir : pathDirs) {
+                    boolean writable = new java.io.File(dir).canWrite();
+                    System.out.println("  " + dir +
+                        (writable ? " <- ОПАСНО: доступна для записи!" : " [OK]"));
+                }
+            }
+        }
+        """;
+
+    private static final String TEMPLATE_HARDCODED = """
+        public class Example {
+            // УЯЗВИМО: секреты прямо в коде!
+            static final String DB_PASSWORD = "SuperSecret123!";
+            static final String API_KEY     = "sk-prod-abc123xyz";
+            static final String AWS_KEY     = "AKIAIOSFODNN7EXAMPLE";
+           \s
+            public static void main(String[] args) {
+                System.out.println("=== Hardcoded Credentials — Сравнение ===");
+                System.out.println();
+               \s
+                // УЯЗВИМЫЙ вариант
+                System.out.println("--- УЯЗВИМО: секреты в коде ---");
+                System.out.println("DB_PASSWORD = \\"" + DB_PASSWORD + "\\"");
+                System.out.println("API_KEY     = \\"" + API_KEY     + "\\"");
+                System.out.println("AWS_KEY     = \\"" + AWS_KEY     + "\\"");
+                System.out.println();
+                System.out.println("Проблемы:");
+                System.out.println("  1. Виден всем кто видит код");
+                System.out.println("  2. Остаётся в Git истории навсегда");
+                System.out.println("  3. JAR декомпилируется за секунды");
+                System.out.println("  4. Нельзя сменить без пересборки");
+                System.out.println();
+               \s
+                // БЕЗОПАСНЫЙ вариант
+                System.out.println("--- БЕЗОПАСНО: переменные окружения ---");
+                String safePassword = System.getenv("DB_PASSWORD");
+                String safeApiKey   = System.getenv("API_KEY");
+               \s
+                System.out.println("DB_PASSWORD = " +
+                    (safePassword != null ? "****** (загружен из окружения)" : "не задана!"));
+                System.out.println("API_KEY     = " +
+                    (safeApiKey   != null ? "****** (загружен из окружения)" : "не задана!"));
+                System.out.println();
+               \s
+                // Сканер — ищем секреты в коде (как truffleHog)
+                System.out.println("=== Сканер секретов ===");
+                String[] codeLines = {
+                    "String pass = \\"admin123\\";",
+                    "String url  = \\"jdbc:mysql://prod:3306/db\\";",
+                    "String key  = System.getenv(\\"API_KEY\\");",
+                    "String token = \\"sk_live_abc123xyz\\";",
+                    "int port = 8080;"
+                };
+               \s
+                for (String line : codeLines) {
+                    boolean suspicious =
+                        line.matches(".*\\"[^\\"]*(pass|key|secret|token|pwd)[^\\"].*\\".*") ||
+                        line.contains("sk_live_") ||
+                        line.contains("jdbc:") ||
+                        (line.contains("\\"") && line.toLowerCase()
+                            .contains("pass"));
+                    System.out.println(
+                        (suspicious ? "[!] НАЙДЕН СЕКРЕТ: " : "[OK]             ") +
+                        line
+                    );
+                }
+            }
+        }
+        """;
+
+    private static final String TEMPLATE_MITM = """
+        import java.net.*;
+        import java.io.*;
+       \s
+        public class Example {
+            public static void main(String[] args) {
+                System.out.println("=== Man-in-the-Middle — Демонстрация ===");
+                System.out.println();
+               \s
+                // Сравнение HTTP vs HTTPS
+                System.out.println("--- Сравнение протоколов ---");
+                System.out.println();
+               \s
+                String[] urls = {
+                    "http://bank.com/login",    // незащищённый
+                    "https://bank.com/login"    // защищённый
+                };
+               \s
+                for (String url : urls) {
+                    boolean isHttps = url.startsWith("https");
+                    System.out.println("URL: " + url);
+                    System.out.println("  Протокол:    " + (isHttps ? "HTTPS" : "HTTP"));
+                    System.out.println("  Шифрование:  " + (isHttps ? "TLS — данные зашифрованы" : "Нет — данные открыты!"));
+                    System.out.println("  MITM атака:  " + (isHttps ? "Злоумышленник видит шифр" : "Злоумышленник видит ВСЁ!"));
+                    System.out.println("  Перехват:    " + (isHttps ? "Защищено (сертификат)" : "user=admin&pass=123456"));
+                    System.out.println();
+                }
+               \s
+                // Симуляция перехваченного HTTP трафика
+                System.out.println("--- Перехваченный HTTP запрос ---");
+                String intercepted =
+                    "POST /login HTTP/1.1\\n" +
+                    "Host: bank.com\\n" +
+                    "Content-Type: application/x-www-form-urlencoded\\n" +
+                    "\\n" +
+                    "username=john&password=MySecret123!&card=4532015112830366";
+               \s
+                System.out.println(intercepted);
+                System.out.println();
+                System.out.println("[!] Злоумышленник получил:");
+                System.out.println("  Логин:    john");
+                System.out.println("  Пароль:   MySecret123!");
+                System.out.println("  Карта:    4532015112830366");
+                System.out.println();
+               \s
+                // Защищённый вариант
+                System.out.println("--- Тот же запрос через HTTPS ---");
+                System.out.println("Злоумышленник видит только зашифрованные данные:");
+                System.out.println("  [TLS Record] \\u2593\\u2593\\u2593\\u2593\\u2593\\u2593\\u2593\\u2593\\u2593\\u2593\\u2593\\u2593");
+                System.out.println("  Расшифровать без ключа невозможно.");
+               \s
+                // Проверка доступности хостов
+                System.out.println();
+                System.out.println("--- Проверка подключения ---");
+                String[] hosts = {"google.com", "cloudflare.com"};
+                for (String host : hosts) {
+                    try {
+                        InetAddress addr = InetAddress.getByName(host);
+                        System.out.println(host + " -> " + addr.getHostAddress() + " [доступен]");
+                    } catch (UnknownHostException e) {
+                        System.out.println(host + " -> недоступен (нет интернета)");
+                    }
+                }
+            }
+        }
+        """;
+
+    private static final String TEMPLATE_DNS = """
+        import java.net.*;
+       \s
+        public class Example {
+            public static void main(String[] args) {
+                System.out.println("=== DNS Spoofing — Демонстрация ===");
+                System.out.println();
+               \s
+                // Симуляция DNS таблицы (нормальная vs подменённая)
+                System.out.println("--- DNS таблица ДО атаки ---");
+                String[][] normalDns = {
+                    {"bank.com",      "93.184.216.34"},
+                    {"google.com",    "142.250.185.46"},
+                    {"paypal.com",    "151.101.1.21"},
+                    {"vk.com",        "87.240.190.78"}
+                };
+               \s
+                for (String[] entry : normalDns) {
+                    System.out.printf("  %-20s -> %s%n", entry[0], entry[1]);
+                }
+               \s
+                System.out.println();
+                System.out.println("--- DNS таблица ПОСЛЕ отравления ---");
+                String hackerIp = "192.168.1.100";
+                String[][] poisonedDns = {
+                    {"bank.com",      hackerIp},           // подменён!
+                    {"google.com",    "142.250.185.46"},   // не тронут
+                    {"paypal.com",    hackerIp},           // подменён!
+                    {"vk.com",        "87.240.190.78"}     // не тронут
+                };
+               \s
+                for (String[] entry : poisonedDns) {
+                    boolean spoofed = entry[1].equals(hackerIp);
+                    System.out.printf("  %-20s -> %-18s %s%n",
+                        entry[0], entry[1],
+                        spoofed ? "<- ПОДМЕНЁН! (IP хакера)" : "[OK]"
+                    );
+                }
+               \s
+                // Реальный DNS резолв для сравнения
+                System.out.println();
+                System.out.println("--- Реальный DNS резолв (ваша система) ---");
+                String[] domainsToCheck = {"google.com", "cloudflare.com", "github.com"};
+               \s
+                for (String domain : domainsToCheck) {
+                    try {
+                        InetAddress addr = InetAddress.getByName(domain);
+                        System.out.printf("  %-20s -> %s%n",
+                            domain, addr.getHostAddress());
+                    } catch (UnknownHostException e) {
+                        System.out.printf("  %-20s -> не удалось разрешить%n", domain);
+                    }
+                }
+               \s
+                // Обнаружение подмены
+                System.out.println();
+                System.out.println("--- Обнаружение DNS Spoofing ---");
+                System.out.println("Сравниваем ответы разных DNS серверов:");
+                System.out.println();
+               \s
+                String[][] comparison = {
+                    {"Локальный DNS",    "bank.com", "192.168.1.100", "ПОДОЗРИТЕЛЬНО!"},
+                    {"Google 8.8.8.8",  "bank.com", "93.184.216.34", "OK"},
+                    {"Cloudflare 1.1.1.1","bank.com","93.184.216.34", "OK"}
+                };
+               \s
+                for (String[] row : comparison) {
+                    System.out.printf("  %-25s -> %-18s [%s]%n",
+                        row[0], row[2], row[3]);
+                }
+               \s
+                System.out.println();
+                System.out.println("Вывод: локальный DNS возвращает другой IP!");
+                System.out.println("Признак DNS Spoofing атаки.");
+                System.out.println();
+                System.out.println("Защита: DNSSEC + DNS over HTTPS (DoH)");
+                System.out.println("  Даже при подмене DNS — сертификат сайта");
+                System.out.println("  не совпадёт → браузер покажет предупреждение.");
+            }
+        }
+        """;
 
     public CodePlayground(JFrame parentWindow) {
         this.parentWindow = parentWindow;
@@ -131,22 +563,63 @@ public class CodePlayground extends JFrame {
         headerPanel.add(hintLabel, BorderLayout.SOUTH);
 
         // ШАБЛОНЫ
-        JPanel templatePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 6));
-        templatePanel.setBackground(new Color(40,40, 58));
-        templatePanel.setBorder(new EmptyBorder(2,8,2,8));
+        JPanel templatePanel = new JPanel();
+        templatePanel.setLayout(new BoxLayout(templatePanel, BoxLayout.Y_AXIS));
+        templatePanel.setBackground(new Color(40,40,58));
+        templatePanel.setBorder(new EmptyBorder(6,8,6,8));
 
-        JLabel templateLabel = new JLabel("Шаблоны:");
-        templateLabel.setForeground(new Color(166,173,200));
-        templateLabel.setFont(new Font("Segou UI", Font.PLAIN,13));
+        JPanel row1 = new JPanel(new FlowLayout(FlowLayout.LEFT,8,4));
+        row1.setBackground(new Color(40,40,58));
 
+        JLabel lblBase = createCategoryLabel("Базовые:");
         JButton tplEmpty = createTemplateButton("Пустой", TEMPLATE_EMPTY);
-        JButton tplSql = createTemplateButton("SQL Injection", TEMPLATE_SQL);
-        JButton tplXss = createTemplateButton("XSS", TEMPLATE_XSS);
 
-        templatePanel.add(templateLabel);
-        templatePanel.add(tplEmpty);
-        templatePanel.add(tplSql);
-        templatePanel.add(tplXss);
+        row1.add(lblBase);
+        row1.add(tplEmpty);
+
+        JPanel row2 = new JPanel(new FlowLayout(FlowLayout.LEFT,8,4));
+        row2.setBackground(new Color(40,40,58));
+
+        JLabel lblWeb = createCategoryLabel("Веб");
+        JButton tplSqlVuln = createTemplateButton("SQL - уязвимый", TEMPLATE_SQL_VULNERABLE);
+        JButton tplSqlSafe = createTemplateButton("SQL - безопасный", TEMPLATE_SQL_SAFE);
+        JButton tplXssVuln = createTemplateButton("XSS - уязвимый", TEMPLATE_XSS_VULNERABLE);
+        JButton tplXssSafe = createTemplateButton("XSS - безопасный",  TEMPLATE_XSS_SAFE);
+        JButton tplTraversal = createTemplateButton("Directory Traversal", TEMPLATE_TRAVERSAL);
+
+        row2.add(lblWeb);
+        row2.add(tplSqlVuln);
+        row2.add(tplSqlSafe);
+        row2.add(tplXssVuln);
+        row2.add(tplXssSafe);
+        row2.add(tplTraversal);
+
+        JPanel row3 = new JPanel(new FlowLayout(FlowLayout.LEFT,8,4));
+        row3.setBackground(new Color(40,40,58));
+
+        JLabel lblSys = createCategoryLabel("Системные");
+        JButton tplPrivilege = createTemplateButton("Privilege Escalation", TEMPLATE_PRIVILEGE);
+        JButton tplHardcoded = createTemplateButton("Hardcoded Credentials", TEMPLATE_HARDCODED);
+
+        row3.add(lblSys);
+        row3.add(tplPrivilege);
+        row3.add(tplHardcoded);
+
+        JPanel row4  = new JPanel(new FlowLayout(FlowLayout.LEFT,8,4));
+        row4.setBackground(new Color(40,40,58));
+
+        JLabel lblNet = createCategoryLabel("Сетевые:");
+        JButton tplMitm = createTemplateButton("MITM", TEMPLATE_MITM);
+        JButton tplDns = createTemplateButton("DNS Spoofing", TEMPLATE_DNS);
+
+        row4.add(lblNet);
+        row4.add(tplMitm);
+        row4.add(tplDns);
+
+        templatePanel.add(row1);
+        templatePanel.add(row2);
+        templatePanel.add(row3);
+        templatePanel.add(row4);
 
         // РЕДАКТОР КОДА
         codeArea = new JTextArea(TEMPLATE_EMPTY);
@@ -731,5 +1204,13 @@ public class CodePlayground extends JFrame {
         int i = pos;
         while (i < text.length() && text.charAt(i) == ' ') i++;
         return i < text.length() ? text.charAt(i) : '\0';
+    }
+
+    private JLabel createCategoryLabel(String text){
+        JLabel label = new JLabel(text);
+        label.setFont(new Font("Segoe UI", Font.BOLD,12));
+        label.setForeground(new Color(137,180,250));
+        label.setPreferredSize(new Dimension(90,24));
+        return label;
     }
 }
