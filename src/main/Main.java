@@ -14,7 +14,8 @@ public static void main(String[] args) {
                 new XssModule(),
                 new DirectoryTraversal(),
                 new PrivilegeEscalation(),
-                new HardcodedCredentials()
+                new HardcodedCredentials(),
+                new MITMModule()
         );
 
         try{
