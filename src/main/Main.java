@@ -1,6 +1,7 @@
 
 import main.modules.*;
 import main.modules.VulnerabilityPack.DirectoryTraversal;
+import main.modules.VulnerabilityPack.PrivilegeEscalation;
 import main.modules.VulnerabilityPack.SQLInjection;
 import main.modules.VulnerabilityPack.XssModule;
 import main.modules.Window;
@@ -14,7 +15,8 @@ public static void main(String[] args) {
         List<Vulnerability> modules = List.of(
                 new SQLInjection(),
                 new XssModule(),
-                new DirectoryTraversal()
+                new DirectoryTraversal(),
+                new PrivilegeEscalation()
         );
 
         try{
