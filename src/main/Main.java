@@ -15,7 +15,8 @@ public static void main(String[] args) {
                 new DirectoryTraversal(),
                 new PrivilegeEscalation(),
                 new HardcodedCredentials(),
-                new MITMModule()
+                new MITMModule(),
+                new DnsSpoofing()
         );
 
         try{
