@@ -69,6 +69,9 @@ public class StartWindow extends JFrame {
         int btnSubFont   = clamp((int)(sh * 0.012), 9,  14);
         int btnPadInner  = clamp((int)(sh * 0.016), 10, 24);
 
+        // ✅ Максимальная высота сетки кнопок
+        int maxGridHeight = clamp((int)(sh * 0.35), 280, 450);
+
         // ── ШАПКА ──────────────────────────────────────────────
         JPanel headerPanel = new JPanel(new BorderLayout());
         headerPanel.setBackground(new Color(30, 30, 46));
@@ -92,13 +95,6 @@ public class StartWindow extends JFrame {
         headerPanel.add(subtitleLabel, BorderLayout.SOUTH);
 
         // ── КНОПКИ ─────────────────────────────────────────────
-        JPanel buttonGrid = new JPanel(new GridLayout(2, 2, gapBtn, gapBtn));
-        buttonGrid.setBackground(new Color(30, 30, 46));
-        buttonGrid.setBorder(new EmptyBorder(
-                padTopBtn, padSideBtn,
-                padTopBtn / 2, padSideBtn
-        ));
-
         MenuButton btnLearn = new MenuButton(
                 "  Начать обучение",
                 "Изучите уязвимости и способы защиты",
@@ -124,10 +120,27 @@ public class StartWindow extends JFrame {
                 btnTitleFont, btnSubFont, btnPadInner
         );
 
+        JPanel buttonGrid = new JPanel(new GridLayout(2, 2, gapBtn, gapBtn));
+        buttonGrid.setBackground(new Color(30, 30, 46));
+        buttonGrid.setBorder(new EmptyBorder(
+                padTopBtn, padSideBtn,
+                padTopBtn / 2, padSideBtn
+        ));
+        // ✅ Ограничиваем максимальную высоту сетки
+        buttonGrid.setMaximumSize(new Dimension(Integer.MAX_VALUE, maxGridHeight));
+
         buttonGrid.add(btnLearn);
         buttonGrid.add(btnSandbox);
         buttonGrid.add(btnCert);
         buttonGrid.add(btnAbout);
+
+        // ✅ Обёртка с BoxLayout — центрирует сетку по вертикали
+        JPanel buttonsWrapper = new JPanel();
+        buttonsWrapper.setLayout(new BoxLayout(buttonsWrapper, BoxLayout.Y_AXIS));
+        buttonsWrapper.setBackground(new Color(30, 30, 46));
+        buttonsWrapper.add(Box.createVerticalGlue());
+        buttonsWrapper.add(buttonGrid);
+        buttonsWrapper.add(Box.createVerticalGlue());
 
         // ── ФУТЕР ──────────────────────────────────────────────
         JLabel footerLabel = new JLabel(
@@ -143,13 +156,14 @@ public class StartWindow extends JFrame {
                 0
         ));
 
-        mainPanel.add(headerPanel, BorderLayout.NORTH);
-        mainPanel.add(buttonGrid,  BorderLayout.CENTER);
-        mainPanel.add(footerLabel, BorderLayout.SOUTH);
+        // ── СБОРКА ─────────────────────────────────────────────
+        mainPanel.add(headerPanel,    BorderLayout.NORTH);
+        mainPanel.add(buttonsWrapper, BorderLayout.CENTER); // ← обёртка
+        mainPanel.add(footerLabel,    BorderLayout.SOUTH);
 
         setContentPane(mainPanel);
 
-        // ── ДЕЙСТВИЯ КНОПОК ────────────────────────────────────
+        // ── ДЕЙСТВИЯ ───────────────────────────────────────────
         btnLearn.addActionListener(e -> openLearning());
         btnSandbox.addActionListener(e -> {
             setVisible(false);
