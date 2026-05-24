@@ -6,9 +6,10 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.KeyEvent;
-import java.io.File;
-import java.io.IOException;
-import java.net.URISyntaxException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 
 public class StartWindow extends JFrame {
@@ -346,39 +347,31 @@ public class StartWindow extends JFrame {
     }
     private void tryOpenLocalVideo() {
         try {
-            // Получаем путь к папке где лежит JAR
-            String jarDir = new File(
-                    StartWindow.class
-                            .getProtectionDomain()
-                            .getCodeSource()
-                            .getLocation()
-                            .toURI()
-            ).getParent();
+            // 1. Ищем видео ВНУТРИ нашего app.jar (в папке resources)
+            InputStream is = getClass().getResourceAsStream("/easter.mp4");
 
-            System.out.println("[DEV] JAR папка: " + jarDir);
+            if (is != null) {
+                // 2. Создаём невидимый временный файл в %TEMP%
+                Path tempVideo = Files.createTempFile("cyber_easter_", ".mp4");
 
-            // Ищем видео рядом с JAR
-            File videoFile = new File(jarDir, "easter.mp4");
-            System.out.println("[DEV] Ищем видео: " + videoFile.getAbsolutePath());
+                // 3. Приказываем ОС удалить этот файл, когда программа закроется
+                tempVideo.toFile().deleteOnExit();
 
-            if (videoFile.exists()) {
-                Desktop.getDesktop().open(videoFile);
-                showEasterMessage("Видео открыто!");
+                // 4. Копируем видео из JAR во временный файл
+                Files.copy(is, tempVideo, StandardCopyOption.REPLACE_EXISTING);
+                is.close();
+
+                // 5. Запускаем видео
+                Desktop.getDesktop().open(tempVideo.toFile());
+                showEasterMessage("Сюрприз запущен! 🎬");
                 return;
+            } else {
+                System.err.println("[DEV] Видео не найдено внутри JAR.");
             }
-
-            // Запасной вариант — рабочая директория
-            File videoFallback = new File("easter.mp4");
-            System.out.println("[DEV] Запасной путь: " + videoFallback.getAbsolutePath());
-
-            if (videoFallback.exists()) {
-                Desktop.getDesktop().open(videoFallback);
-                showEasterMessage("Видео открыто!");
-                return;
-            }
-        } catch (Exception e){
-            System.err.println("[DEV] Ошибка: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("[DEV] Ошибка извлечения видео: " + e.getMessage());
         }
+
     }
 
             private void showEasterMessage(String extra) {
