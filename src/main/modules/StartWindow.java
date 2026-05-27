@@ -2,10 +2,12 @@ package main.modules;
 
 import main.Utils.CodePlayground;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.KeyEvent;
+import java.awt.image.BufferedImage;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,8 +24,12 @@ public class StartWindow extends JFrame {
             KeyEvent.VK_SHIFT, KeyEvent.VK_G, KeyEvent.VK_A, KeyEvent.VK_Y,
     };
 
-    private final int[] easterInput = new int[SECRET_CODE.length];
-    private int easterIndex = 0;
+    private static final int [] SECRET_CODE_ANDREW = {
+            KeyEvent.VK_SHIFT, KeyEvent.VK_L, KeyEvent.VK_O, KeyEvent.VK_H
+    };
+
+    private int photoIndex = 0;
+    private int videoIndex = 0;
     private boolean easterActive = false;
     private javax.swing.Timer easterTimer = null;
 
@@ -275,18 +281,21 @@ public class StartWindow extends JFrame {
     }
 
     private void startEasterEggListening() {
-        easterIndex = 0;
+        videoIndex   = 0;
+        photoIndex   = 0;
         easterActive = true;
 
         if (easterTimer != null) easterTimer.stop();
         easterTimer = new javax.swing.Timer(5000, e -> {
             easterActive = false;
-            easterIndex = 0;
+            videoIndex   = 0;
+            photoIndex   = 0;
+            System.out.println("[DEV] Easter egg timeout");
         });
-
         easterTimer.setRepeats(false);
         easterTimer.start();
-        System.out.println("[DEV] easter egg");
+
+        System.out.println("[DEV] Easter egg listening started...");
     }
 
     private void checkEasterKey(int keyCode){
@@ -294,21 +303,40 @@ public class StartWindow extends JFrame {
             return;
         }
 
-        if (keyCode == SECRET_CODE[easterIndex]) {
-            easterIndex++;
-            System.out.println("[DEV] easter progress" +  easterIndex + "/" + SECRET_CODE.length);
+        if (keyCode == SECRET_CODE[videoIndex]) {
+            videoIndex++;
+            System.out.println("[DEV] Видео прогресс: " +  videoIndex + "/" + SECRET_CODE.length);
 
-            if (easterIndex == SECRET_CODE.length) {
+            if (videoIndex == SECRET_CODE.length) {
                 easterActive = false;
                 if (easterTimer != null) easterTimer.stop();
-                triggerEasterEgg();
+                videoIndex = 0;
+                photoIndex = 0;
+                triggerEasterEgg("video");
+                return;
             }
         } else {
-            easterIndex = 0;
+            videoIndex = 0;
+        }
+
+        if (keyCode == SECRET_CODE_ANDREW[photoIndex]){
+            photoIndex++;
+            System.out.println("[DEV] Фото прогресс: " +   photoIndex + "/" + SECRET_CODE_ANDREW.length);
+
+            if (photoIndex == SECRET_CODE_ANDREW.length) {
+                easterActive = false;
+                if (easterTimer != null) easterTimer.stop();
+                videoIndex = 0;
+                photoIndex = 0;
+                triggerEasterEgg("photo");
+                return;
+            }
+        } else{
+            photoIndex = 0;
         }
     }
 
-    private void triggerEasterEgg() {
+    private void triggerEasterEgg(String type) {
         JDialog loading = new JDialog(this, "", false);
         loading.setUndecorated(true);
         loading.setBackground(new Color(0, 0, 0, 0));
@@ -336,11 +364,16 @@ public class StartWindow extends JFrame {
             if (frame[0] > 4) {
                 anim.stop();
                 loading.dispose();
-                openEasterVideo(); // запускаем видео
+                if (type.equals("video")){
+                    openEasterVideo();
+                } else {
+                    openEasterPhoto();
+                }
             }
         });
         anim.start();
     }
+
 
     private void openEasterVideo() {
         tryOpenLocalVideo();
@@ -374,10 +407,162 @@ public class StartWindow extends JFrame {
 
     }
 
+    private void openEasterPhoto(){tryOpenLocalPhoto();}
+    private void tryOpenLocalPhoto(){
+        try{
+            InputStream is = getClass().getResourceAsStream("/easter_photo.jpg");
+
+            if (is != null) {
+                System.out.println("[DEV] Фото не найдено внутри JAR");
+                showEasterPhotoFallback();
+                return;
+            }
+
+            Path tempPhoto = Files.createTempFile("cache_img_", ".tmp");
+            tempPhoto.toFile().deleteOnExit();
+
+            try (InputStream input = is){
+                Files.copy(input, tempPhoto, StandardCopyOption.REPLACE_EXISTING);
+            }
+
+            System.out.println("[DEV] Фото распаковано в: " + tempPhoto);
+
+            Desktop.getDesktop().open(tempPhoto.toFile());
+            showEasterMessage("Пасхалкооо");
+
+        } catch (Exception e) {
+            System.err.println("[DEV] Ошибка извлечения видео: " + e.getMessage());
+            showEasterPhotoFallback();
+        }
+    }
+
+    private void showEasterPhotoFallback() {
+        try {
+            InputStream is = StartWindow.class
+                    .getResourceAsStream("/easter_photo.jpg");
+
+            if (is == null) {
+                JOptionPane.showMessageDialog(
+                        this,
+                        "Поздравляем! Вы нашли вторую пасхалку!\n\n" +
+                                "Но файл фото не найден в ресурсах.",
+                        "Easter Egg #2",
+                        JOptionPane.INFORMATION_MESSAGE
+                );
+                return;
+            }
+
+            // ✅ Читаем как BufferedImage чтобы можно было повернуть
+            BufferedImage original = ImageIO.read(is);
+
+            // ✅ Поворачиваем — меняй градусы как нужно:
+            // 90  — повернуть вправо (горизонтальное → вертикальное)
+            // -90 — повернуть влево
+            // 180 — перевернуть
+            BufferedImage rotated = rotateImage(original, 90);
+
+            // Масштабируем под экран
+            int maxW = clamp((int)(sw * 0.4), 300, 700);
+            int maxH = clamp((int)(sh * 0.7), 400, 900);
+
+            double scaleX = (double) maxW / rotated.getWidth();
+            double scaleY = (double) maxH / rotated.getHeight();
+            double scale  = Math.min(scaleX, scaleY);
+            scale = Math.min(scale, 1.0);
+
+            int newW = (int)(rotated.getWidth()  * scale);
+            int newH = (int)(rotated.getHeight() * scale);
+
+            Image scaled = rotated.getScaledInstance(
+                    newW, newH, Image.SCALE_SMOOTH
+            );
+            ImageIcon scaledIcon = new ImageIcon(scaled);
+
+            // ── Окно с фото ────────────────────────────────────
+            JDialog photoDialog = new JDialog(this, "Easter Egg #2", true);
+            photoDialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+            photoDialog.getContentPane().setBackground(new Color(20, 20, 32));
+
+            JPanel panel = new JPanel(new BorderLayout(0, 10));
+            panel.setBackground(new Color(20, 20, 32));
+            panel.setBorder(new EmptyBorder(16, 16, 16, 16));
+
+            JLabel titleLbl = new JLabel(
+                    "Поздравляем! Вы нашли вторую пасхалку!",
+                    SwingConstants.CENTER
+            );
+            titleLbl.setFont(new Font("Segoe UI", Font.BOLD, 16));
+            titleLbl.setForeground(new Color(137, 180, 250));
+
+            JLabel photoLbl = new JLabel(scaledIcon, SwingConstants.CENTER);
+            photoLbl.setBorder(BorderFactory.createLineBorder(
+                    new Color(86, 130, 200), 2
+            ));
+
+            JButton closeBtn = new JButton("Закрыть");
+            closeBtn.setBackground(new Color(86, 130, 200));
+            closeBtn.setForeground(Color.WHITE);
+            closeBtn.setFont(new Font("Segoe UI", Font.BOLD, 13));
+            closeBtn.setBorderPainted(false);
+            closeBtn.setFocusPainted(false);
+            closeBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            closeBtn.addActionListener(e -> photoDialog.dispose());
+
+            panel.add(titleLbl,  BorderLayout.NORTH);
+            panel.add(photoLbl,  BorderLayout.CENTER);
+            panel.add(closeBtn,  BorderLayout.SOUTH);
+
+            photoDialog.add(panel);
+            photoDialog.pack();
+            photoDialog.setLocationRelativeTo(this);
+            photoDialog.setVisible(true);
+
+        } catch (Exception e) {
+            System.err.println("[DEV] Ошибка: " + e.getMessage());
+        }
+    }
+
+    private BufferedImage rotateImage(BufferedImage source, double degrees) {
+        double radians = Math.toRadians(degrees);
+        double sin     = Math.abs(Math.sin(radians));
+        double cos     = Math.abs(Math.cos(radians));
+
+        int originalW = source.getWidth();
+        int originalH = source.getHeight();
+
+        int newW = (int) Math.floor(originalW * cos + originalH * sin);
+        int newH = (int) Math.floor(originalH * cos + originalW * sin);
+
+        BufferedImage rotated = new BufferedImage(
+                newW, newH, BufferedImage.TYPE_INT_ARGB
+        );
+
+        Graphics2D g2d = rotated.createGraphics();
+        g2d.setRenderingHint(
+                RenderingHints.KEY_INTERPOLATION,
+                RenderingHints.VALUE_INTERPOLATION_BICUBIC // качественный поворот
+        );
+        g2d.setRenderingHint(
+                RenderingHints.KEY_ANTIALIASING,
+                RenderingHints.VALUE_ANTIALIAS_ON
+        );
+
+        // Переносим центр, поворачиваем, рисуем
+        g2d.translate(newW / 2.0, newH / 2.0);
+        g2d.rotate(radians);
+        g2d.translate(-originalW / 2.0, -originalH / 2.0);
+        g2d.drawImage(source, 0, 0, null);
+        g2d.dispose();
+
+        return rotated;
+    }
+
             private void showEasterMessage(String extra) {
         JOptionPane.showMessageDialog(this,
                 "Пасхалка!\n\n" + extra,
                 "Easter egg",
                 JOptionPane.INFORMATION_MESSAGE);
     };
+
+
 }
