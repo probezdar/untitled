@@ -78,7 +78,6 @@ public class StartWindow extends JFrame {
         JPanel mainPanel = new JPanel(new BorderLayout());
         mainPanel.setBackground(new Color(30, 30, 46));
 
-        // ── АДАПТИВНЫЕ РАЗМЕРЫ ─────────────────────────────────
         int titleFont    = clamp((int)(sh * 0.038), 22, 42);
         int subtitleFont = clamp((int)(sh * 0.013), 10, 16);
         int footerFont   = clamp((int)(sh * 0.011), 9,  13);
@@ -96,7 +95,6 @@ public class StartWindow extends JFrame {
 
         int maxGridHeight = clamp((int)(sh * 0.35), 280, 450);
 
-        // ── ШАПКА ──────────────────────────────────────────────
         JPanel headerPanel = new JPanel(new BorderLayout());
         headerPanel.setBackground(new Color(30, 30, 46));
         headerPanel.setBorder(new EmptyBorder(
@@ -118,7 +116,6 @@ public class StartWindow extends JFrame {
         headerPanel.add(titleLabel,    BorderLayout.CENTER);
         headerPanel.add(subtitleLabel, BorderLayout.SOUTH);
 
-        // ── КНОПКИ ─────────────────────────────────────────────
         MenuButton btnLearn = new MenuButton(
                 "  Начать обучение",
                 "Изучите уязвимости и способы защиты",
@@ -166,7 +163,6 @@ public class StartWindow extends JFrame {
         buttonsWrapper.add(buttonGrid);
         buttonsWrapper.add(Box.createVerticalGlue());
 
-        // ── ФУТЕР ──────────────────────────────────────────────
         JLabel footerLabel = new JLabel(
                 "© 2026 CyberPractice  |  Версия 1.0",
                 SwingConstants.CENTER
@@ -180,14 +176,13 @@ public class StartWindow extends JFrame {
                 0
         ));
 
-        // ── СБОРКА ─────────────────────────────────────────────
+
         mainPanel.add(headerPanel,    BorderLayout.NORTH);
         mainPanel.add(buttonsWrapper, BorderLayout.CENTER); // ← обёртка
         mainPanel.add(footerLabel,    BorderLayout.SOUTH);
 
         setContentPane(mainPanel);
 
-        // ── ДЕЙСТВИЯ ───────────────────────────────────────────
         btnLearn.addActionListener(e -> openLearning());
         btnSandbox.addActionListener(e -> {
             setVisible(false);
@@ -452,16 +447,10 @@ public class StartWindow extends JFrame {
                 return;
             }
 
-            // ✅ Читаем как BufferedImage чтобы можно было повернуть
             BufferedImage original = ImageIO.read(is);
 
-            // ✅ Поворачиваем — меняй градусы как нужно:
-            // 90  — повернуть вправо (горизонтальное → вертикальное)
-            // -90 — повернуть влево
-            // 180 — перевернуть
             BufferedImage rotated = rotateImage(original, 90);
 
-            // Масштабируем под экран
             int maxW = clamp((int)(sw * 0.4), 300, 700);
             int maxH = clamp((int)(sh * 0.7), 400, 900);
 
@@ -478,7 +467,6 @@ public class StartWindow extends JFrame {
             );
             ImageIcon scaledIcon = new ImageIcon(scaled);
 
-            // ── Окно с фото ────────────────────────────────────
             JDialog photoDialog = new JDialog(this, "Easter Egg #2", true);
             photoDialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
             photoDialog.getContentPane().setBackground(new Color(20, 20, 32));
@@ -540,14 +528,13 @@ public class StartWindow extends JFrame {
         Graphics2D g2d = rotated.createGraphics();
         g2d.setRenderingHint(
                 RenderingHints.KEY_INTERPOLATION,
-                RenderingHints.VALUE_INTERPOLATION_BICUBIC // качественный поворот
+                RenderingHints.VALUE_INTERPOLATION_BICUBIC
         );
         g2d.setRenderingHint(
                 RenderingHints.KEY_ANTIALIASING,
                 RenderingHints.VALUE_ANTIALIAS_ON
         );
 
-        // Переносим центр, поворачиваем, рисуем
         g2d.translate(newW / 2.0, newH / 2.0);
         g2d.rotate(radians);
         g2d.translate(-originalW / 2.0, -originalH / 2.0);
