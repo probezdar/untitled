@@ -229,7 +229,9 @@ public class StartWindow extends JFrame {
                         "  • Man-in-the-Middle (MITM)\n" +
                         "  • DNS Spoofing\n\n" +
                         "Используйте знания только в законных целях.",
-                "О программе",
+                "О программе" +
+                        "https://github.com/probezdar" +
+                        "probezdar,Egoistodemon, MultiMedved, garazhhhhh",
                 JOptionPane.INFORMATION_MESSAGE
         );
     }
